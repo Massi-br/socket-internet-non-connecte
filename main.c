@@ -100,7 +100,7 @@ int main(int argc , char* argv[]){
                 char ip_pointe[MAX_ADDR_LEN];
                 inet_ntop(AF_INET, &addr_from.sin_addr.s_addr, ip_pointe, sizeof(ip_pointe));
                 
-                // Vérification si l'adresse IP est déjà dans ip_tab
+               
                 bool is_in = false;
                 for (size_t i = 0; i < index; i++) {
                     if (strcmp(ip_tab[i], ip_pointe) == 0) {
@@ -108,7 +108,7 @@ int main(int argc , char* argv[]){
                         break;
                     }
                 }
-                // Si l'adresse IP n'est pas dans ip_tab, l'ajouter
+                
                 if (!is_in) {
                     strncpy(ip_tab[index], ip_pointe, MAX_ADDR_LEN);
                     index += 1;
