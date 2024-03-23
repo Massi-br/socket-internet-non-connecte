@@ -5,20 +5,26 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <stdbool.h>
+#include <signal.h>
+#include <time.h>
 
 #define PORT 6336
 #define BUF_SIZE 1024
 #define MAX_ADDR_LEN 16
 #define ARRAY_SIZE 50
-// #define TIMER_ALARM 5
+#define TIMER_ALARM 5
 
 
 char ip_tab[ARRAY_SIZE][MAX_ADDR_LEN];
 size_t index = 0;
 
+
+void gestionnaire(int signum);
+
+
 int main(int argc , char* argv[]){
     if (argc != 2) {
-        fprintf(stderr, "Usage :./exe  chaine\n");
+        fprintf(stderr, "Usage : ./exe  chaine\n");
         exit(EXIT_FAILURE);
     }
 
@@ -26,6 +32,41 @@ int main(int argc , char* argv[]){
     int bcenable = 1;
     struct sockaddr_in addr;
     int n;
+    sigset_t set;
+    if (sigfillset(&set) == -1) {
+        perror("sigfillset");
+        exit(EXIT_FAILURE);
+    }
+
+    struct sigaction act;
+    act.sa_handler = gestionnaire;
+    if (sigfillset(&act.sa_mask) == -1) {
+        perror("sigfillset");
+        exit(EXIT_FAILURE);
+    }
+    act.sa_flags = SA_RESTART;
+
+    if (sigdelset(&set, SIGINT) == -1) {
+        perror("sigfillset");
+        exit(EXIT_FAILURE);
+    }
+    if (sigdelset(&set, SIGALRM) == -1) {
+        perror("sigfillset");
+        exit(EXIT_FAILURE);
+    }
+
+    if (sigaction(SIGALRM, &act, NULL) == -1) {
+        perror("sigaction");
+        exit(EXIT_FAILURE);
+    }
+
+    if (sigprocmask(SIG_SETMASK, &set, NULL) == -1) {
+        perror("sigprocmask");
+        exit(EXIT_FAILURE);
+    }
+
+
+    alarm(TIMER_ALARM);
 
     switch (fork()) {
     case -1:
@@ -86,21 +127,15 @@ int main(int argc , char* argv[]){
             struct sockaddr_in addr_from;
             socklen_t add_len = sizeof(addr_from);
 
-        while (1) {
-        memset(buffer, 0, BUF_SIZE); 
-        ssize_t recv_bytes = recvfrom(sock, buffer, BUF_SIZE, 0, (struct sockaddr*)&addr_from, &add_len);
-        if (recv_bytes == (ssize_t)-1) {
-            perror("recvfrom");
-            exit(EXIT_FAILURE);
-        } else if (recv_bytes > 0) {
-            printf("Message reçu du client : %s\n", buffer);
+        while (recvfrom(sock, buffer, BUF_SIZE, 0, (struct sockaddr*)&addr_from, &add_len)) {
+            printf("[+] Message reçu du client : %s\n", buffer);
             // Comparaison du message reçu avec argv[1]
             if (strcmp(buffer,chaine) == 0) {
-                printf("C'est le bon message\n");
+                printf("[+] C'est le bon message\n");
+
                 char ip_pointe[MAX_ADDR_LEN];
-                inet_ntop(AF_INET, &addr_from.sin_addr.s_addr, ip_pointe, sizeof(ip_pointe));
+                inet_ntop(AF_INET, &addr_from.sin_addr.s_addr, ip_pointe, sizeof(ip_pointe));               
                 
-               
                 bool is_in = false;
                 for (size_t i = 0; i < index; i++) {
                     if (strcmp(ip_tab[i], ip_pointe) == 0) {
@@ -108,20 +143,28 @@ int main(int argc , char* argv[]){
                         break;
                     }
                 }
-                
                 if (!is_in) {
                     strncpy(ip_tab[index], ip_pointe, MAX_ADDR_LEN);
                     index += 1;
                 }
             } else {
-                printf("Ce n'est pas le bon message\n");
+                printf("[-] Ce n'est pas le bon message\n");
             }
-        }
     }
-    
     break;
-        
     }
 
     return EXIT_SUCCESS;
+}
+
+void gestionnaire(int signum){
+  if (signum < 0) {
+    fprintf(stderr, "Invalid signal number\n");
+    exit(EXIT_FAILURE);
+  }
+  printf("Les IP ayant répondus avec la bonne chaine :\n");
+  for(size_t i = 0; i < index; i++){
+    printf("%s\n", ip_tab[i]);
+  }
+  alarm(TIMER_ALARM);
 }
